@@ -29,7 +29,7 @@ jobs:
 
       - name: Run Semgrep SAST (OWASP Top 10 rules)
         run: |
-          emgrep \
+          semgrep \
             --config p/owasp-top-ten \
             --include canonicalization-example \
             --include fastbank-auth-lab \
