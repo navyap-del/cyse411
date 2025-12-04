@@ -21,27 +21,16 @@ app.get("/csrf-token", (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
-/**
- * VULNERABLE FAKE USER DB
- * For simplicity, we start with a single user whose password is "password123".
- * In the vulnerable version, we hash with a fast hash (SHA-256-like).
- */
 const users = [
   {
     id: 1,
     username: "student",
-    // Secure: bcrypt hash with salt and cost factor 12
     passwordHash: bcrypt.hashSync("password123", 12)
   }
 ];
 
 // In-memory session store
 const sessions = {}; // token -> { userId }
-
-/**
- * VULNERABLE FAST HASH FUNCTION
- * Students MUST STOP using this and replace logic with bcrypt.
- */
 
 // Helper: find user by username
 function findUser(username) {
@@ -59,46 +48,33 @@ app.get("/api/me", (req, res) => {
   res.json({ authenticated: true, username: user.username });
 });
 
-/**
- * VULNERABLE LOGIN ENDPOINT
- * - Uses fastHash instead of bcrypt
- * - Error messages leak whether username exists
- * - Session token is simple and predictable
- * - Cookie lacks security flags
- */
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
   const user = findUser(username);
 
+  // Unified login failure message to avoid enumeration
+  const failResponse = { success: false, message: "Invalid credentials" };
+
   if (!user) {
-    // VULNERABLE: username enumeration via message
-    return res
-      .status(401)
-      .json({ success: false, message: "Unknown username" });
+    return res.status(401).json(failResponse);
   }
 
   const passwordMatch = bcrypt.compareSync(password, user.passwordHash);
-  
+
   if (!passwordMatch) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Wrong password" });
+    return res.status(401).json(failResponse);
   }
 
-  // Secure: random, high-entropy token
   const token = crypto.randomBytes(32).toString("hex");
 
-  // VULNERABLE: session stored without expiration
   sessions[token] = { userId: user.id };
 
-  // VULNERABLE: cookie without httpOnly, secure, sameSite
    res.cookie("session", token, {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
   });
 
-  // Client-side JS (login.html) will store this token in localStorage (vulnerable)
   res.json({ success: true, token });
 });
 
