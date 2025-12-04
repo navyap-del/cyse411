@@ -3,8 +3,15 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { body, validationResult } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
+// Basic rate limiting to prevent brute-force and enumeration
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 100
+});
+app.use(limiter);
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -52,11 +59,19 @@ app.post(
 // Vulnerable route (demo)
 app.post('/read-no-validate', (req, res) => {
   const filename = req.body.filename || '';
-  const joined = path.join(BASE_DIR, filename); // intentionally vulnerable
-  if (!fs.existsSync(joined)) return res.status(404).json({ error: 'File not found', path: joined });
-  const content = fs.readFileSync(joined, 'utf8');
-  res.json({ path: joined, content });
+
+  // Fix: restrict filename to basename only (prevents path traversal)
+  const safeName = path.basename(filename);
+  const safePath = path.join(BASE_DIR, safeName);
+
+  if (!fs.existsSync(safePath)) {
+    return res.status(404).json({ error: 'File not found', path: safePath });
+  }
+
+  const content = fs.readFileSync(safePath, 'utf8');
+  res.json({ path: safePath, content });
 });
+
 
 // Helper route for samples
 app.post('/setup-sample', (req, res) => {
