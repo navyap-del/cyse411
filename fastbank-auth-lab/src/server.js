@@ -2,8 +2,8 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const crypto = require("crypto");
-// bcrypt is installed but NOT used in the vulnerable baseline:
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");      // use bcryptjs
+const csrf = require("csurf");           // CSRF protection
 
 const app = express();
 const PORT = 3001;
@@ -12,6 +12,14 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(express.static("public"));
+
+// Enable CSRF protection using cookies
+app.use(csrf({ cookie: true }));
+
+// Endpoint to fetch CSRF token (front-end / tools can call this)
+app.get("/csrf-token", (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
 
 /**
  * VULNERABLE FAKE USER DB
@@ -22,8 +30,8 @@ const users = [
   {
     id: 1,
     username: "student",
-    // VULNERABLE: fast hash without salt
-    passwordHash: fastHash("password123") // students must replace this scheme with bcrypt
+    // Secure: bcrypt hash with salt and cost factor 12
+    passwordHash: bcrypt.hashSync("password123", 12)
   }
 ];
 
@@ -72,22 +80,24 @@ app.post("/api/login", (req, res) => {
       .json({ success: false, message: "Unknown username" });
   }
 
-  const candidateHash = fastHash(password);
-  if (candidateHash !== user.passwordHash) {
+   const passwordMatch = bcrypt.compareSync(password, user.passwordHash);
+  if (!passwordMatch) {
     return res
       .status(401)
       .json({ success: false, message: "Wrong password" });
   }
 
-  // VULNERABLE: predictable token
-  const token = username + "-" + Date.now();
+  // Secure: random, high-entropy token
+  const token = crypto.randomBytes(32).toString("hex");
 
   // VULNERABLE: session stored without expiration
   sessions[token] = { userId: user.id };
 
   // VULNERABLE: cookie without httpOnly, secure, sameSite
-  res.cookie("session", token, {
-    // students must add: httpOnly: true, secure: true, sameSite: "lax"
+   res.cookie("session", token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
   });
 
   // Client-side JS (login.html) will store this token in localStorage (vulnerable)
