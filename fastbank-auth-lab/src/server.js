@@ -49,8 +49,36 @@ app.get("/api/me", (req, res) => {
 });
 
 app.post("/api/login", (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, _csrf } = req.body;
+
+  if (!_csrf || _csrf !== req.csrfToken()) {
+    return res.status(403).json({ error: "Invalid CSRF token" });
+  }
+
   const user = findUser(username);
+  const failResponse = { success: false, message: "Invalid credentials" };
+
+  if (!user) {
+    return res.status(401).json(failResponse);
+  }
+
+  const passwordMatch = bcrypt.compareSync(password, user.passwordHash);
+
+  if (!passwordMatch) {
+    return res.status(401).json(failResponse);
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  sessions[token] = { userId: user.id };
+
+  res.cookie("session", token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+  });
+
+  res.json({ success: true, token });
+});
 
   // Unified login failure message to avoid enumeration
   const failResponse = { success: false, message: "Invalid credentials" };
