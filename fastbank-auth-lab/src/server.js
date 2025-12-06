@@ -51,11 +51,13 @@ app.get("/api/me", (req, res) => {
 app.post("/api/login", (req, res) => {
   const { username, password, _csrf } = req.body;
 
+  // CSRF validation
   if (!_csrf || _csrf !== req.csrfToken()) {
     return res.status(403).json({ error: "Invalid CSRF token" });
   }
 
   const user = findUser(username);
+
   const failResponse = { success: false, message: "Invalid credentials" };
 
   if (!user) {
@@ -69,6 +71,7 @@ app.post("/api/login", (req, res) => {
   }
 
   const token = crypto.randomBytes(32).toString("hex");
+
   sessions[token] = { userId: user.id };
 
   res.cookie("session", token, {
@@ -79,6 +82,7 @@ app.post("/api/login", (req, res) => {
 
   res.json({ success: true, token });
 });
+
 
   // Unified login failure message to avoid enumeration
   const failResponse = { success: false, message: "Invalid credentials" };
