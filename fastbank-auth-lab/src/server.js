@@ -2,8 +2,8 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const crypto = require("crypto");
-const bcrypt = require("bcryptjs");      // use bcryptjs
-const csrf = require("csurf");           // CSRF protection
+const bcrypt = require("bcryptjs"); 
+const csrf = require("csurf");
 
 const app = express();
 const PORT = 3001;
@@ -13,10 +13,8 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(express.static("public"));
 
-// Enable CSRF protection using cookies
 app.use(csrf({ cookie: true }));
 
-// Endpoint to fetch CSRF token (front-end / tools can call this)
 app.get("/csrf-token", (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
@@ -29,15 +27,12 @@ const users = [
   }
 ];
 
-// In-memory session store
-const sessions = {}; // token -> { userId }
+const sessions = {}; 
 
-// Helper: find user by username
 function findUser(username) {
   return users.find((u) => u.username === username);
 }
 
-// Home API just to show who is logged in
 app.get("/api/me", (req, res) => {
   const token = req.cookies.session;
   if (!token || !sessions[token]) {
@@ -57,7 +52,6 @@ app.post("/api/login", (req, res) => {
   }
 
   const user = findUser(username);
-
   const failResponse = { success: false, message: "Invalid credentials" };
 
   if (!user) {
@@ -65,43 +59,14 @@ app.post("/api/login", (req, res) => {
   }
 
   const passwordMatch = bcrypt.compareSync(password, user.passwordHash);
-
   if (!passwordMatch) {
     return res.status(401).json(failResponse);
   }
 
   const token = crypto.randomBytes(32).toString("hex");
-
   sessions[token] = { userId: user.id };
 
   res.cookie("session", token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-  });
-
-  res.json({ success: true, token });
-});
-
-
-  // Unified login failure message to avoid enumeration
-  const failResponse = { success: false, message: "Invalid credentials" };
-
-  if (!user) {
-    return res.status(401).json(failResponse);
-  }
-
-  const passwordMatch = bcrypt.compareSync(password, user.passwordHash);
-
-  if (!passwordMatch) {
-    return res.status(401).json(failResponse);
-  }
-
-  const token = crypto.randomBytes(32).toString("hex");
-
-  sessions[token] = { userId: user.id };
-
-   res.cookie("session", token, {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
