@@ -62,17 +62,26 @@ app.post(
 );
 
 // Vulnerable route (demo)
-app.post('/read-no-validate', readLimiter, (req, res) => { 
+app.post('/read-no-validate', readLimiter, (req, res) => {
   const filename = req.body.filename || "";
 
-  // Force filename to be only a basename (no directories)
+  // Force simple basename (demo)
   const safeName = path.basename(filename);
-
   const resolved = path.join(BASE_DIR, safeName);
+
+  // prevent traversal
+  if (!resolved.startsWith(BASE_DIR + path.sep)) {
+    return res.status(403).json({ error: "Path traversal detected" });
+  }
 
   if (!fs.existsSync(resolved)) {
     return res.status(404).json({ error: "File not found" });
   }
+
+  const content = fs.readFileSync(resolved, "utf8");
+  res.json({ path: resolved, content });
+});
+
 
   const content = fs.readFileSync(resolved, "utf8");
   res.json({ path: resolved, content });
