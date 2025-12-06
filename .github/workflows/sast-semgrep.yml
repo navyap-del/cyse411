@@ -31,9 +31,9 @@ jobs:
         run: |
           semgrep \
             --config p/owasp-top-ten \
-            --include canonicalization-example \
-            --include fastbank-auth-lab \
-            --include idor \
+            --include 'canonicalization-example/**' \
+            --include 'fastbank-auth-lab/**' \
+            --include 'idor/**' \
             --error \
             --sarif --output semgrep-results.sarif
         
