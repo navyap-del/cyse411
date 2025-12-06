@@ -37,7 +37,7 @@ function fakeAuth(req, res, next) {
 // Apply fakeAuth to all routes below this line
 app.use(fakeAuth);
 
-// VULNERABLE endpoint: no ownership check (IDOR)
+// VULNERABLE endpoint: no ownership check (IDOR) (FIXED)
 app.get("/orders/:id", (req, res) => {
   const orderId = parseInt(req.params.id, 10);
 
@@ -46,7 +46,11 @@ app.get("/orders/:id", (req, res) => {
     return res.status(404).json({ error: "Order not found" });
   }
 
-  // BUG: no check that order.userId === req.user.id
+  // Authorization check: user can only access their own orders
+  if (order.userId !== req.user.id) {
+    return res.status(403).json({ error: "Forbidden: You do not own this order" });
+  }
+
   return res.json(order);
 });
 
