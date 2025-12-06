@@ -6,12 +6,14 @@ const { body, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
-// Basic rate limiting to prevent brute-force and enumeration
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
-  max: 100
+
+// Per-route rate limiting (fix for CodeQL “Missing rate limiting”)
+const readLimiter = rateLimit({
+  windowMs: 60 * 1000,   // 1 minute
+  max: 10,               // limit per minute
+  message: { error: "Too many requests — slow down" }
 });
-app.use(limiter);
+
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -30,6 +32,7 @@ function resolveSafe(baseDir, userInput) {
 // Secure route
 app.post(
   '/read',
+  readLimiter, 
   body('filename')
     .exists().withMessage('filename required')
     .bail()
@@ -46,9 +49,11 @@ app.post(
 
     const filename = req.body.filename;
     const normalized = resolveSafe(BASE_DIR, filename);
+
     if (!normalized.startsWith(BASE_DIR + path.sep)) {
       return res.status(403).json({ error: 'Path traversal detected' });
     }
+
     if (!fs.existsSync(normalized)) return res.status(404).json({ error: 'File not found' });
 
     const content = fs.readFileSync(normalized, 'utf8');
@@ -57,7 +62,7 @@ app.post(
 );
 
 // Vulnerable route (demo)
-app.post('/read-no-validate', (req, res) => {
+app.post('/read-no-validate', readLimiter, (req, res) => { 
   const filename = req.body.filename || "";
 
   // Force filename to be only a basename (no directories)
